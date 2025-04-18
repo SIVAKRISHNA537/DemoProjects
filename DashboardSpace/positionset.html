@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PDF Page Selector</title>
+  <title>PDF Page Selector with Draggable Box</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <style>
     body {
@@ -12,9 +12,9 @@
     .controls {
       margin-bottom: 20px;
     }
-    .controls select {
+    .controls select, .controls input {
       margin-right: 10px;
-      width: 150px;
+      width: 100px;
     }
     #display {
       border: 2px dashed #aaa;
@@ -22,11 +22,15 @@
       background-color: #f9f9f9;
       width: 600px;
       height: 800px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: top left;
     }
     #box {
       position: absolute;
       background-color: rgba(0, 128, 0, 0.3);
       border-radius: 5px;
+      cursor: move;
     }
   </style>
 </head>
@@ -35,9 +39,9 @@
   <h2>Upload PDF and Select Page</h2>
   <input type="file" id="fileInput" accept="application/pdf" />
   <br><br>
-  
+
   <div class="controls">
-    <label>Page: 
+    <label>Page:
       <select id="pageSelector" onchange="renderPage()">
         <option value="">Select a page</option>
       </select>
@@ -54,12 +58,11 @@
   </div>
 
   <script>
-    let pdfDoc = null; // To store the PDF document
-    let totalPages = 0; // Total number of pages
-    let pageWidth = 600;  // Default values
+    let pdfDoc = null;
+    let totalPages = 0;
+    let pageWidth = 600;
     let pageHeight = 800;
-    
-    // Handle PDF file upload
+
     document.getElementById('fileInput').addEventListener('change', handleFileUpload);
 
     function handleFileUpload(event) {
@@ -73,9 +76,7 @@
             pdfDoc = pdf;
             totalPages = pdf.numPages;
 
-            // Populate the page selector dropdown
             const pageSelector = document.getElementById('pageSelector');
-            pageSelector.innerHTML = ''; // Clear previous options
             pageSelector.innerHTML = '<option value="">Select a page</option>';
             for (let i = 1; i <= totalPages; i++) {
               const option = document.createElement('option');
@@ -84,7 +85,6 @@
               pageSelector.appendChild(option);
             }
 
-            // Optionally render the first page
             renderPage();
           });
         };
@@ -102,21 +102,19 @@
           pageWidth = viewport.width;
           pageHeight = viewport.height;
 
-          // Display the page as an image or canvas
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           canvas.width = pageWidth;
           canvas.height = pageHeight;
-          document.getElementById('display').style.width = pageWidth + 'px';
-          document.getElementById('display').style.height = pageHeight + 'px';
-          
-          // Render the page into the canvas
+
+          const displayDiv = document.getElementById('display');
+          displayDiv.style.width = pageWidth + 'px';
+          displayDiv.style.height = pageHeight + 'px';
+
           page.render({
             canvasContext: ctx,
             viewport: viewport
           }).promise.then(function() {
-            // Set the canvas as background image for display
-            const displayDiv = document.getElementById('display');
             displayDiv.style.backgroundImage = `url(${canvas.toDataURL()})`;
           });
         });
@@ -124,17 +122,58 @@
     }
 
     function updateBox() {
-      const x = document.getElementById('x').value;
-      const y = document.getElementById('y').value;
-      const width = document.getElementById('width').value;
-      const height = document.getElementById('height').value;
+      const x = parseInt(document.getElementById('x').value, 10);
+      const y = parseInt(document.getElementById('y').value, 10);
+      const width = parseInt(document.getElementById('width').value, 10);
+      const height = parseInt(document.getElementById('height').value, 10);
+
+      const displayHeight = document.getElementById('display').offsetHeight;
 
       const box = document.getElementById('box');
       box.style.left = x + 'px';
-      box.style.bottom = y + 'px';
+      box.style.top = (displayHeight - y - height) + 'px';
       box.style.width = width + 'px';
       box.style.height = height + 'px';
     }
+
+    // Dragging logic
+    const box = document.getElementById('box');
+    const display = document.getElementById('display');
+    let isDragging = false;
+    let offsetX = 0, offsetY = 0;
+
+    box.addEventListener('mousedown', function(e) {
+      isDragging = true;
+      const rect = box.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!isDragging) return;
+
+      const displayRect = display.getBoundingClientRect();
+      let newLeft = e.clientX - displayRect.left - offsetX;
+      let newTop = e.clientY - displayRect.top - offsetY;
+
+      // Clamp within display bounds
+      newLeft = Math.max(0, Math.min(newLeft, display.offsetWidth - box.offsetWidth));
+      newTop = Math.max(0, Math.min(newTop, display.offsetHeight - box.offsetHeight));
+
+      box.style.left = newLeft + 'px';
+      box.style.top = newTop + 'px';
+
+      // Update X and Y inputs (Y is from bottom)
+      const bottomY = display.offsetHeight - newTop - box.offsetHeight;
+      document.getElementById('x').value = Math.round(newLeft);
+      document.getElementById('y').value = Math.round(bottomY);
+    });
+
+    document.addEventListener('mouseup', function() {
+      isDragging = false;
+      document.body.style.userSelect = 'auto';
+    });
   </script>
 
 </body>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF Page Selector</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    .controls {
+      margin-bottom: 20px;
+    }
+    .controls select {
+      margin-right: 10px;
+      width: 150px;
+    }
+    #display {
+      border: 2px dashed #aaa;
+      position: relative;
+      background-color: #f9f9f9;
+      width: 600px;
+      height: 800px;
+    }
+    #box {
+      position: absolute;
+      background-color: rgba(0, 128, 0, 0.3);
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Upload PDF and Select Page</h2>
+  <input type="file" id="fileInput" accept="application/pdf" />
+  <br><br>
+  
+  <div class="controls">
+    <label>Page: 
+      <select id="pageSelector" onchange="renderPage()">
+        <option value="">Select a page</option>
+      </select>
+    </label>
+    <label>X: <input type="number" id="x" value="50"></label>
+    <label>Y: <input type="number" id="y" value="50"></label>
+    <label>Width: <input type="number" id="width" value="100"></label>
+    <label>Height: <input type="number" id="height" value="100"></label>
+    <button onclick="updateBox()">Set</button>
+  </div>
+
+  <div id="display">
+    <div id="box"></div>
+  </div>
+
+  <script>
+    let pdfDoc = null; // To store the PDF document
+    let totalPages = 0; // Total number of pages
+    let pageWidth = 600;  // Default values
+    let pageHeight = 800;
+    
+    // Handle PDF file upload
+    document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (file && file.type === 'application/pdf') {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const arrayBuffer = e.target.result;
+          const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+          loadingTask.promise.then(function(pdf) {
+            pdfDoc = pdf;
+            totalPages = pdf.numPages;
+
+            // Populate the page selector dropdown
+            const pageSelector = document.getElementById('pageSelector');
+            pageSelector.innerHTML = ''; // Clear previous options
+            pageSelector.innerHTML = '<option value="">Select a page</option>';
+            for (let i = 1; i <= totalPages; i++) {
+              const option = document.createElement('option');
+              option.value = i;
+              option.textContent = `Page ${i}`;
+              pageSelector.appendChild(option);
+            }
+
+            // Optionally render the first page
+            renderPage();
+          });
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        alert("Please upload a valid PDF file.");
+      }
+    }
+
+    function renderPage() {
+      const pageNum = document.getElementById('pageSelector').value;
+      if (pageNum) {
+        pdfDoc.getPage(parseInt(pageNum)).then(function(page) {
+          const viewport = page.getViewport({ scale: 1 });
+          pageWidth = viewport.width;
+          pageHeight = viewport.height;
+
+          // Display the page as an image or canvas
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = pageWidth;
+          canvas.height = pageHeight;
+          document.getElementById('display').style.width = pageWidth + 'px';
+          document.getElementById('display').style.height = pageHeight + 'px';
+          
+          // Render the page into the canvas
+          page.render({
+            canvasContext: ctx,
+            viewport: viewport
+          }).promise.then(function() {
+            // Set the canvas as background image for display
+            const displayDiv = document.getElementById('display');
+            displayDiv.style.backgroundImage = `url(${canvas.toDataURL()})`;
+          });
+        });
+      }
+    }
+
+    function updateBox() {
+      const x = document.getElementById('x').value;
+      const y = document.getElementById('y').value;
+      const width = document.getElementById('width').value;
+      const height = document.getElementById('height').value;
+
+      const box = document.getElementById('box');
+      box.style.left = x + 'px';
+      box.style.bottom = y + 'px';
+      box.style.width = width + 'px';
+      box.style.height = height + 'px';
+    }
+  </script>
+
+</body>
+</html>
